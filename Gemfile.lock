@@ -1,12 +1,34 @@
 GEM
   remote: https://rubygems.org/
+  remote: https://rubygems.pkg.github.com/burnt43/
   specs:
+    activesupport (6.1.1)
+      concurrent-ruby (~> 1.0, >= 1.0.2)
+      i18n (>= 1.6, < 2)
+      minitest (>= 5.1)
+      tzinfo (~> 2.0)
+      zeitwerk (~> 2.3)
+    concurrent-ruby (1.1.8)
+    i18n (1.8.8)
+      concurrent-ruby (~> 1.0)
+    minitest (5.14.3)
+    rake (13.0.3)
+    ruby-lazy-config (0.0.1)
+      activesupport
+    ruby-lazy-const (0.0.2)
+      activesupport
     sqlite3 (1.4.2)
+    tzinfo (2.0.4)
+      concurrent-ruby (~> 1.0)
+    zeitwerk (2.4.2)
 
 PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  rake
+  ruby-lazy-config (= 0.0.1)!
+  ruby-lazy-const (= 0.0.2)!
   sqlite3
 
 BUNDLED WITH
