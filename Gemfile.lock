@@ -13,7 +13,7 @@ GEM
       concurrent-ruby (~> 1.0)
     minitest (5.14.3)
     rake (13.0.3)
-    ruby-lazy-config (0.0.1)
+    ruby-lazy-config (0.0.2)
       activesupport
     ruby-lazy-const (0.0.2)
       activesupport
@@ -27,7 +27,7 @@ PLATFORMS
 
 DEPENDENCIES
   rake
-  ruby-lazy-config (= 0.0.1)!
+  ruby-lazy-config (= 0.0.2)!
   ruby-lazy-const (= 0.0.2)!
   sqlite3
 

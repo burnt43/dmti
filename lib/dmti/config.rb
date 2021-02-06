@@ -10,6 +10,10 @@ module Dmti
       def config_filename
         '.dmti.yaml'
       end
+
+      def database_pathname
+        @database_pathname ||= Pathname.new(config['database'])
+      end
     end
   end
 end
