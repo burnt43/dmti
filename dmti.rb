@@ -1,0 +1,3 @@
+require 'initialize'
+
+puts 'TEST'
