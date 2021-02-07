@@ -9,6 +9,7 @@ GEM
       tzinfo (~> 2.0)
       zeitwerk (~> 2.3)
     concurrent-ruby (1.1.8)
+    curses (1.4.0)
     i18n (1.8.8)
       concurrent-ruby (~> 1.0)
     minitest (5.14.3)
@@ -26,6 +27,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  curses
   rake
   ruby-lazy-config (= 0.0.2)!
   ruby-lazy-const (= 0.0.2)!

@@ -6,6 +6,7 @@ require 'bundler/setup'
 require 'sqlite3'
 require 'ruby-lazy-const'
 require 'ruby-lazy-config'
+require 'curses'
 
 # Other Requires
 require 'pathname'
