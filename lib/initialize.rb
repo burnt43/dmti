@@ -17,11 +17,19 @@ LazyConfig::Config.base_dir = "/home/#{`whoami`.strip}"
 module Curses
   class Window
     def height
-      self.maxy - self.begy
+      self.maxy
     end
 
     def width
-      self.maxx - self.begx
+      self.maxx
+    end
+
+    def miny
+      0
+    end
+
+    def minx
+      0
     end
   end
 
@@ -36,6 +44,7 @@ module Curses
         Curses.use_default_colors
         Curses.raw
         Curses.noecho
+        Curses.curs_set(0)
       end
 
       def def_color(name, r, g, b)
@@ -147,12 +156,37 @@ module Curses
         else
           @main_curses_window.keypad(true)
         end
+
+        set_title(@title_text)
+      end
+
+      def set_title(title)
+        return unless has_border?
+
+        effective_title_text =
+          if extended_title_bar?
+            title + (' ' * (@sub_curses_window.width - title.size))
+          else
+            @title_text
+          end
+
+        @main_curses_window.setpos(0, BORDER_SIZE)
+        @main_curses_window.attron(Curses::A_STANDOUT)
+        @main_curses_window << effective_title_text
+        @main_curses_window.attroff(Curses::A_STANDOUT)
       end
 
       # Refresh all windows this wrapper has.
       def refresh
         @main_curses_window.refresh
         @sub_curses_window.refresh if has_sub_window?
+      end
+
+      def nlcr
+        new_y = cury + 1
+        new_x = 0
+
+        setpos(new_y, new_x)
       end
 
       # Relay any methods to the Curses::Window object.
@@ -164,7 +198,43 @@ module Curses
         end
       end
 
+      def debug_print_stats
+        objs = %i[main_curses_window]
+        objs.push(:sub_curses_window) if has_sub_window?
+
+        attrs = %i[
+          begy
+          begx
+          miny
+          minx
+          maxy
+          maxx
+          height
+          width
+        ]
+
+        objs.each do |object_name|
+          obj = instance_variable_get("@#{object_name}")
+
+          attrs.each do |attr_name|
+            val = obj.send(attr_name)
+
+            addstr(sprintf("%s %s", "#{object_name}.#{attr_name}", val.to_s))
+            nlcr
+          end
+        end
+
+      end
+
       private
+
+      def center_title?
+        @center_title
+      end
+
+      def extended_title_bar?
+        @extend_title_bar
+      end
 
       def has_sub_window?
         @sub_curses_window
