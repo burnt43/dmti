@@ -110,8 +110,70 @@ module Curses
       end
     end
 
+    class Menu
+      def initialize(
+        height=nil,
+        width=nil,
+        top=nil,
+        left=nil,
+        *item_names,
+        **keyword_args
+      )
+        @curses_items_mapped_by_name = item_names.each_with_object({}) do |item_name, hash|
+          hash[item_name] = Curses::Item.new(item_name, '')
+        end
+
+        @curses_menu = Curses::Menu.new(@curses_items_mapped_by_name.values)
+
+        keyword_args_for_window = keyword_args.slice(
+          :border,
+          :title_text,
+          :center_title,
+          :extend_title_bar
+        )
+        @ext_window = Curses::Ext::Window.new(
+          height, width, top, left,
+          **keyword_args_for_window
+        )
+
+        @curses_menu.set_win(@ext_window.main_curses_window)
+
+        if @ext_window.sub_curses_window
+          @curses_menu.set_sub(@ext_window.sub_curses_window)
+        else
+          @curses_menu.set_sub(@ext_window.generate_sub_window!)
+        end
+      end
+
+      #
+      # Menu Methods
+      #
+
+      def show
+        @curses_menu.post
+      end
+
+      def hide
+        @curses_menu.hide
+      end
+
+      #
+      # Window Methods
+      #
+      def getch
+        @ext_window.getch
+      end
+
+      def refresh
+        @ext_window.refresh
+      end
+    end
+
     class Window
       BORDER_SIZE = 1
+
+      attr_reader :main_curses_window
+      attr_reader :sub_curses_window
 
       def initialize(
         height=nil,
@@ -153,13 +215,8 @@ module Curses
         # inside of the main window.
         if has_border?
           @main_curses_window.box(0, 0)
-          @sub_curses_window = Curses::Window.new(
-            @main_curses_window.height - (2 * BORDER_SIZE),
-            @main_curses_window.width - (2 * BORDER_SIZE),
-            @main_curses_window.begy + BORDER_SIZE,
-            @main_curses_window.begx + BORDER_SIZE
-          )
 
+          @sub_curses_window = generate_sub_window!
           @sub_curses_window.keypad(true)
         else
           @main_curses_window.keypad(true)
@@ -179,6 +236,85 @@ module Curses
 
         setpos(new_y, new_x)
       end
+
+      #
+      # Derived/Sub-Window Methods
+      #
+
+      def generate_sub_window!
+        return unless @main_curses_window
+
+        if has_border?
+          # Derive a window from the main window to fit inside the border
+          # created with box().
+          @main_curses_window.derwin(
+            @main_curses_window.height - (2 * BORDER_SIZE),
+            @main_curses_window.width - (2 * BORDER_SIZE),
+            BORDER_SIZE,
+            BORDER_SIZE
+          )
+        else
+          # Derive a window the same exact size, since there is no border.
+          @main_curses_window.derwin(
+            @main_curses_window.height,
+            @main_curses_window.width,
+            0,
+            0
+          )
+        end
+      end
+
+      #
+      # Override Curses::Window Methods
+      #
+
+      # Refresh all windows this wrapper has.
+      def refresh
+        @main_curses_window.refresh
+        @sub_curses_window.refresh if has_sub_window?
+      end
+
+      #
+      # Metaprogramming - Relay Methods
+      #
+
+      def method_missing(method_name, *args, &block)
+        effective_window.send(method_name, *args, &block)
+      end
+
+      #
+      # Debugging Methods
+      #
+
+      def debug_print_stats
+        objs = %i[main_curses_window]
+        objs.push(:sub_curses_window) if has_sub_window?
+
+        attrs = %i[
+          begy
+          begx
+          miny
+          minx
+          maxy
+          maxx
+          height
+          width
+        ]
+
+        objs.each do |object_name|
+          obj = instance_variable_get("@#{object_name}")
+
+          attrs.each do |attr_name|
+            val = obj.send(attr_name)
+
+            addstr(sprintf("%s %s", "#{object_name}.#{attr_name}", val.to_s))
+            nlcr
+          end
+        end
+
+      end
+
+      private
 
       #
       # Window Wrapper Management Methods
@@ -231,58 +367,6 @@ module Curses
       def effective_window
         has_sub_window? ? @sub_curses_window : @main_curses_window
       end
-
-      #
-      # Override Curses::Window methods
-      #
-
-      # Refresh all windows this wrapper has.
-      def refresh
-        @main_curses_window.refresh
-        @sub_curses_window.refresh if has_sub_window?
-      end
-
-      #
-      # Metaprogramming - Relay Methods
-      #
-
-      def method_missing(method_name, *args, &block)
-        effective_window.send(method_name, *args, &block)
-      end
-
-      #
-      # Debugging Methods
-      #
-
-      def debug_print_stats
-        objs = %i[main_curses_window]
-        objs.push(:sub_curses_window) if has_sub_window?
-
-        attrs = %i[
-          begy
-          begx
-          miny
-          minx
-          maxy
-          maxx
-          height
-          width
-        ]
-
-        objs.each do |object_name|
-          obj = instance_variable_get("@#{object_name}")
-
-          attrs.each do |attr_name|
-            val = obj.send(attr_name)
-
-            addstr(sprintf("%s %s", "#{object_name}.#{attr_name}", val.to_s))
-            nlcr
-          end
-        end
-
-      end
-
-      private
 
       #
       # Dimension Methods
