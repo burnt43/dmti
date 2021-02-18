@@ -114,20 +114,28 @@ module Curses
       BORDER_SIZE = 1
 
       def initialize(
-        height=Curses.stdscr.maxy,
-        width=Curses.stdscr.maxx,
-        top=0,
-        left=0,
+        height=nil,
+        width=nil,
+        top=nil,
+        left=nil,
         border: true,
         title_text: 'Title',
         center_title: true,
         extend_title_bar: true
       )
+        @parent_window = Curses.stdscr
+
         # Assign attributes.
-        @height = height
-        @width = width
-        @top = top
-        @left = left
+        @top_literal = top
+        @left_literal = left
+        @height_literal = height
+        @width_literal = width
+
+        @top = calc_absolute_top
+        @left = calc_absolute_left
+        @height = calc_absolute_height
+        @width = calc_absolute_width
+
         @border = border
         @title_text = title_text
         @center_title = center_title
@@ -157,31 +165,14 @@ module Curses
           @main_curses_window.keypad(true)
         end
 
-        set_title(@title_text)
+        print_title(@title_text)
       end
 
-      def set_title(title)
-        return unless has_border?
+      #
+      # Text Helper Methods
+      #
 
-        effective_title_text =
-          if extended_title_bar?
-            title + (' ' * (@sub_curses_window.width - title.size))
-          else
-            @title_text
-          end
-
-        @main_curses_window.setpos(0, BORDER_SIZE)
-        @main_curses_window.attron(Curses::A_STANDOUT)
-        @main_curses_window << effective_title_text
-        @main_curses_window.attroff(Curses::A_STANDOUT)
-      end
-
-      # Refresh all windows this wrapper has.
-      def refresh
-        @main_curses_window.refresh
-        @sub_curses_window.refresh if has_sub_window?
-      end
-
+      # nlcr = New Line; Carriage Return
       def nlcr
         new_y = cury + 1
         new_x = 0
@@ -189,14 +180,79 @@ module Curses
         setpos(new_y, new_x)
       end
 
-      # Relay any methods to the Curses::Window object.
-      def method_missing(method_name, *args, &block)
-        if has_sub_window?
-          @sub_curses_window.send(method_name, *args, &block)
+      #
+      # Window Wrapper Management Methods
+      #
+
+      def print_title(title)
+        return unless has_border?
+
+        @main_curses_window.attron(Curses::A_STANDOUT)
+
+        if center_title?
+          # Figure out how much whitespace should go on the left and right
+          # of the string so we know where to place the string so it appears
+          # centered.
+          total_ws_chars = @sub_curses_window.width - title.length 
+          left_ws_chars = (total_ws_chars / 2.0).floor
+          right_ws_chars = (total_ws_chars / 2.0).ceil
+
+          if extended_title_bar?
+            # Add whitespace chars to the title on left and right to
+            # be centered.
+            my_title_text = (' ' * left_ws_chars) + title + (' ' * right_ws_chars)
+
+            @main_curses_window.setpos(0, BORDER_SIZE)
+            @main_curses_window << my_title_text
+          else
+            # Set the position based on how much whitespace should be on the
+            # left of the string, even though we are not outputing any white
+            # space chars.
+            @main_curses_window.setpos(0, BORDER_SIZE + left_ws_chars)
+            @main_curses_window << @title_text
+          end
         else
-          @main_curses_window.send(method_name, *args, &block)
+          if extended_title_bar?
+            # Add whitespace until the end of the title space.
+            my_title_text = title + (' ' * (@sub_curses_window.width - title.size))
+
+            @main_curses_window.setpos(0, BORDER_SIZE)
+            @main_curses_window << my_title_text
+          else
+            # Just print the string as is in the top left of the title area.
+            @main_curses_window.setpos(0, BORDER_SIZE)
+            @main_curses_window << @title_text
+          end
         end
+
+        @main_curses_window.attroff(Curses::A_STANDOUT)
       end
+
+      def effective_window
+        has_sub_window? ? @sub_curses_window : @main_curses_window
+      end
+
+      #
+      # Override Curses::Window methods
+      #
+
+      # Refresh all windows this wrapper has.
+      def refresh
+        @main_curses_window.refresh
+        @sub_curses_window.refresh if has_sub_window?
+      end
+
+      #
+      # Metaprogramming - Relay Methods
+      #
+
+      def method_missing(method_name, *args, &block)
+        effective_window.send(method_name, *args, &block)
+      end
+
+      #
+      # Debugging Methods
+      #
 
       def debug_print_stats
         objs = %i[main_curses_window]
@@ -227,6 +283,62 @@ module Curses
       end
 
       private
+
+      #
+      # Dimension Methods
+      #
+      
+      def calc_absolute_top
+        if @top_literal
+          if @top_literal.is_a?(Float) || @top_literal.is_a?(Rational)
+            @parent_window.begy + (@parent_window.maxy * @top_literal).floor
+          else
+            @top_literal
+          end
+        else
+          @parent_window.begy
+        end
+      end
+
+      def calc_absolute_left
+        if @left_literal
+          if @left_literal.is_a?(Float) || @left_literal.is_a?(Rational)
+            @parent_window.begx + (@parent_window.maxx * @left_literal).floor
+          else
+            @left_literal
+          end
+        else
+          @parent_window.begx
+        end
+      end
+
+      def calc_absolute_height
+        if @height_literal
+          if @height_literal.is_a?(Float) || @height_literal.is_a?(Rational)
+            (@parent_window.height * @height_literal).floor
+          else
+            @height_literal
+          end
+        else
+          @parent_window.height
+        end
+      end
+
+      def calc_absolute_width
+        if @width_literal
+          if @width_literal.is_a?(Float) || @width_literal.is_a?(Rational)
+            (@parent_window.width * @width_literal).floor
+          else
+            @width_literal
+          end
+        else
+          @parent_window.width
+        end
+      end
+
+      #
+      # Question Methods
+      #
 
       def center_title?
         @center_title
