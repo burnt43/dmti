@@ -121,27 +121,30 @@ module Curses
 
         @curses_menu = Curses::Menu.new(@curses_items_mapped_by_name.values)
 
-        keyword_args_for_window = keyword_args.slice(
-          :height,
-          :width,
-          :top,
-          :left,
-          :border,
-          :title_text,
-          :center_title,
-          :extend_title_bar
+        # TODO: If given options has border: false, then we don't need top
+        # padding I don't think.
+        default_args_for_window = {
+          sub_window_top_padding: 1
+        }
+
+        keyword_args_for_window = default_args_for_window.merge(
+          keyword_args.slice(
+            :height,
+            :width,
+            :top,
+            :left,
+            :border,
+            :title_text,
+            :center_title,
+            :extend_title_bar
+          )
         )
         @ext_window = Curses::Ext::Window.new(
           **keyword_args_for_window
         )
 
         @curses_menu.set_win(@ext_window.main_curses_window)
-
-        if @ext_window.sub_curses_window
-          @curses_menu.set_sub(@ext_window.sub_curses_window)
-        else
-          @curses_menu.set_sub(@ext_window.generate_sub_window!)
-        end
+        @curses_menu.set_sub(@ext_window.find_or_generate_sub_window)
       end
 
       #
@@ -164,7 +167,16 @@ module Curses
       end
 
       def refresh
+        # @ext_window.sub_curses_window.box('o', 'o')
         @ext_window.refresh
+      end
+
+      #
+      # Metaprogramming - Relay Methods
+      #
+
+      def method_missing(method_name, *args, &block)
+        @curses_menu.send(method_name, *args, &block)
       end
     end
 
@@ -179,6 +191,7 @@ module Curses
         width: nil,
         top: nil,
         left: nil,
+        sub_window_top_padding: 0,
         border: true,
         title_text: 'Title',
         center_title: true,
@@ -192,15 +205,18 @@ module Curses
         @height_literal = height
         @width_literal = width
 
-        @top = calc_absolute_top
-        @left = calc_absolute_left
-        @height = calc_absolute_height
-        @width = calc_absolute_width
+        @sub_window_top_padding = sub_window_top_padding
 
         @border = border
         @title_text = title_text
         @center_title = center_title
         @extend_title_bar = extend_title_bar
+
+        # Calculate dimensions from input.
+        @top = calc_absolute_top
+        @left = calc_absolute_left
+        @height = calc_absolute_height
+        @width = calc_absolute_width
 
         # Create the actual curses window.
         @main_curses_window = Curses::Window.new(
@@ -215,7 +231,7 @@ module Curses
         if has_border?
           @main_curses_window.box(0, 0)
 
-          @sub_curses_window = generate_sub_window!
+          find_or_generate_sub_window
           @sub_curses_window.keypad(true)
         else
           @main_curses_window.keypad(true)
@@ -240,27 +256,29 @@ module Curses
       # Derived/Sub-Window Methods
       #
 
-      def generate_sub_window!
+      def find_or_generate_sub_window
+        return @sub_curses_window if @sub_curses_window
         return unless @main_curses_window
 
-        if has_border?
-          # Derive a window from the main window to fit inside the border
-          # created with box().
-          @main_curses_window.derwin(
-            @main_curses_window.height - (2 * BORDER_SIZE),
-            @main_curses_window.width - (2 * BORDER_SIZE),
-            BORDER_SIZE,
-            BORDER_SIZE
-          )
-        else
-          # Derive a window the same exact size, since there is no border.
-          @main_curses_window.derwin(
-            @main_curses_window.height,
-            @main_curses_window.width,
-            0,
-            0
-          )
-        end
+        @sub_curses_window =
+          if has_border?
+            # Derive a window from the main window to fit inside the border
+            # created with box().
+            @main_curses_window.derwin(
+              @main_curses_window.height - (2 * BORDER_SIZE) - @sub_window_top_padding,
+              @main_curses_window.width - (2 * BORDER_SIZE),
+              BORDER_SIZE + @sub_window_top_padding,
+              BORDER_SIZE
+            )
+          else
+            # Derive a window the same exact size, since there is no border.
+            @main_curses_window.derwin(
+              @main_curses_window.height,
+              @main_curses_window.width,
+              0,
+              0
+            )
+          end
       end
 
       #
