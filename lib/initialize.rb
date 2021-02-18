@@ -112,10 +112,6 @@ module Curses
 
     class Menu
       def initialize(
-        height=nil,
-        width=nil,
-        top=nil,
-        left=nil,
         *item_names,
         **keyword_args
       )
@@ -126,13 +122,16 @@ module Curses
         @curses_menu = Curses::Menu.new(@curses_items_mapped_by_name.values)
 
         keyword_args_for_window = keyword_args.slice(
+          :height,
+          :width,
+          :top,
+          :left,
           :border,
           :title_text,
           :center_title,
           :extend_title_bar
         )
         @ext_window = Curses::Ext::Window.new(
-          height, width, top, left,
           **keyword_args_for_window
         )
 
@@ -176,10 +175,10 @@ module Curses
       attr_reader :sub_curses_window
 
       def initialize(
-        height=nil,
-        width=nil,
-        top=nil,
-        left=nil,
+        height: nil,
+        width: nil,
+        top: nil,
+        left: nil,
         border: true,
         title_text: 'Title',
         center_title: true,
