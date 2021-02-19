@@ -1,4 +1,4 @@
-require 'initialize'
+require 'curses'
 
 Curses.init_screen
 Curses.start_color
@@ -6,31 +6,31 @@ Curses.use_default_colors
 Curses.raw
 Curses.noecho
 
-Curses.init_color(100, 1000, 0, 0)
-Curses.init_pair(50, Curses::COLOR_BLACK, Curses::COLOR_RED)
-Curses.init_pair(51, Curses::COLOR_GREEN, Curses::COLOR_GREEN)
+# Curses.init_color(100, 1000, 0, 0)
+# Curses.init_pair(50, Curses::COLOR_BLACK, Curses::COLOR_RED)
+# Curses.init_pair(51, Curses::COLOR_GREEN, Curses::COLOR_GREEN)
 
-main_window = Curses.stdscr
-pad = Curses::Pad.new(10, 30)
-pad.keypad(true)
-pad.scrollok(false)
 
-pad_y = 0
-
-pad << "This is the same sentence repeated over and over. " * 6
-pad.refresh(pad_y,0, 10,10, main_window.maxy,main_window.maxx)
-
-loop do
-  ch = pad.getch
-  case ch
-  when 'j'
-    pad.refresh(pad_y += 1,0, 10,10, main_window.maxy,main_window.maxx)
-  when 'k'
-    pad.refresh(pad_y -= 1,0, 10,10, main_window.maxy,main_window.maxx)
-  when Curses::Key::F1
-    break
-  end
-end
+# pad = Curses::Pad.new(10, 30)
+# pad.keypad(true)
+# pad.scrollok(false)
+# 
+# pad_y = 0
+# 
+# pad << "This is the same sentence repeated over and over. " * 6
+# pad.refresh(pad_y,0, 10,10, main_window.maxy,main_window.maxx)
+# 
+# loop do
+#   ch = pad.getch
+#   case ch
+#   when 'j'
+#     pad.refresh(pad_y += 1,0, 10,10, main_window.maxy,main_window.maxx)
+#   when 'k'
+#     pad.refresh(pad_y -= 1,0, 10,10, main_window.maxy,main_window.maxx)
+#   when Curses::Key::F1
+#     break
+#   end
+# end
 
 
 # main_window.keypad(true)
@@ -39,33 +39,37 @@ end
 # main_window.refresh
 
 
-
-=begin
-sub_window = main_window.derwin(
+main_window = Curses.stdscr
+menu_window = main_window.derwin(
   main_window.maxy - 2,
   main_window.maxx - 2,
   1, 1
 )
-sub_window.refresh
+main_window.box(0, 0)
 
-items = [
-  Curses::Item.new('Item 01', ''),
-  Curses::Item.new('Item 02', ''),
-  Curses::Item.new('Item 03', '')
-]
+items = 25.times.map do |n|
+  Curses::Item.new("Item #{n}", '')
+end
 menu = Curses::Menu.new(items)
 
-menu_window = sub_window.derwin(20, 40, 1, 1)
-menu_window.box(0, 0)
-menu_container = menu_window.derwin(18, 38, 1, 1)
+menu.set_win(main_window)
+menu.set_sub(menu_window)
 
-menu.set_win(menu_window)
-menu.set_sub(menu_container)
-
+main_window.refresh
 menu_window.refresh
-menu_container.refresh
 
 menu.post
+
+loop do
+  ch = main_window.getch
+
+  case ch
+  when 'q'
+    break
+  end
+end
+
+=begin
 
 form_window = sub_window.derwin(20, 40, 1, 50)
 form_window.box(0, 0)

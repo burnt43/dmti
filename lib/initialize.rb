@@ -186,15 +186,27 @@ module Curses
         # Set the sub_window for thsi menu to be the sub_window of the
         # Ext::Window object. If there was not already a sub_window generated
         # for the Ext::Window, then we'll generate one here.
-        @curses_menu.set_sub(@ext_window.find_or_generate_sub_window)
+        menu_sub_window = @ext_window.find_or_generate_sub_window
+        @curses_menu.set_sub(menu_sub_window)
+
+        # The default amount of rows for a curses menu seems to be 16. Here
+        # we change it to be the amount of rows in the sub_win that this
+        # menu lives in.
+        @curses_menu.set_format(menu_sub_window.height, 1)
+      end
+
+      #
+      # Callback Methods
+      #
+
+      def def_selected_callback(item_name, lambda_callback)
+        @selected_callbacks ||= {}
+        @selected_callbacks[item_name] = lambda_callback
       end
 
       #
       # Input Loop Methods
       #
-
-      def def_input_loop_callback(curses_key, &block)
-      end
 
       def run_input_loop
         loop do
@@ -211,6 +223,8 @@ module Curses
             unless first_item_selected?
               up_item
             end
+          when 'l'
+            selected_callback_lookup&.call
           when 'q'
             break
           when 'x'
@@ -221,10 +235,6 @@ module Curses
 
       def kill_input_loop!
         @input_loop_death_flag = true
-      end
-
-      def should_kill_input_loop?
-        @input_loop_death_flag
       end
 
       #
@@ -239,23 +249,15 @@ module Curses
         @curses_menu.hide
       end
 
-      def first_item_selected?
-        current_item == @curses_items_mapped_by_name.values[0]
-      end
-
-      def last_item_selected?
-        current_item == @curses_items_mapped_by_name.values[-1]
-      end
-
       #
       # Window Methods
       #
+
       def getch
         @ext_window.getch
       end
 
       def refresh
-        # @ext_window.sub_curses_window.box('o', 'o')
         @ext_window.refresh
       end
 
@@ -265,6 +267,38 @@ module Curses
 
       def method_missing(method_name, *args, &block)
         @curses_menu.send(method_name, *args, &block)
+      end
+
+      private
+
+      #
+      # Callback Methods
+      #
+
+      def selected_callback_lookup
+        return unless @selected_callbacks
+
+        @selected_callbacks[current_item&.name]
+      end
+
+      #
+      # Input Loop Methods
+      #
+
+      def should_kill_input_loop?
+        @input_loop_death_flag
+      end
+
+      #
+      # Menu Methods
+      #
+
+      def first_item_selected?
+        current_item == @curses_items_mapped_by_name.values[0]
+      end
+
+      def last_item_selected?
+        current_item == @curses_items_mapped_by_name.values[-1]
       end
     end
 

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+irb_bin=/usr/bin/irb
+include_options=/home/jcarson/git_clones/dmti/lib
+
+$irb_bin -I${include_options} -r 'initialize'
