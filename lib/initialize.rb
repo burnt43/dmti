@@ -190,6 +190,44 @@ module Curses
       end
 
       #
+      # Input Loop Methods
+      #
+
+      def def_input_loop_callback(curses_key, &block)
+      end
+
+      def run_input_loop
+        loop do
+          break if should_kill_input_loop?
+
+          ch = getch
+
+          case ch
+          when 'j'
+            unless last_item_selected?
+              down_item
+            end
+          when 'k'
+            unless first_item_selected?
+              up_item
+            end
+          when 'q'
+            break
+          when 'x'
+            break
+          end
+        end
+      end
+
+      def kill_input_loop!
+        @input_loop_death_flag = true
+      end
+
+      def should_kill_input_loop?
+        @input_loop_death_flag
+      end
+
+      #
       # Menu Methods
       #
 
@@ -199,6 +237,14 @@ module Curses
 
       def hide
         @curses_menu.hide
+      end
+
+      def first_item_selected?
+        current_item == @curses_items_mapped_by_name.values[0]
+      end
+
+      def last_item_selected?
+        current_item == @curses_items_mapped_by_name.values[-1]
       end
 
       #

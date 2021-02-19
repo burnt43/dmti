@@ -23,18 +23,12 @@ module Dmti
     def run!
       @menu.show
       @menu.refresh
+
       @song_list_window.setpos(0,0)
       @song_list_window << "@menu.item_count: #{@menu.item_count}"
       @song_list_window.refresh
 
-      loop do
-        ch = @menu.getch
-
-        case ch
-        when Curses::Key::F1
-          break
-        end
-      end
+      @menu.run_input_loop
     end
 
     private
