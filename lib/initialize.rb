@@ -34,10 +34,15 @@ module Curses
   end
 
   module Ext
+    # Initial indexes when defining colors and color_pairs.
+    # NOTE: I chose high-ish numbers because I don't want to override
+    #   any of the default colors.
     FIRST_COLOR_INDEX = 20
     FIRST_COLOR_PAIR_INDEX = 30
 
     class << self
+      # Initialize curses mode in the terminal. Also set some other options
+      # that I pretty much always use.
       def init
         Curses.init_screen
         Curses.start_color
@@ -47,6 +52,9 @@ module Curses
         Curses.curs_set(0)
       end
 
+      # Create a color definition by name. Instead of the RGB values being
+      # out of 1,000 like default curses, this is out of 255, which is
+      # something I'm more familiar with.
       def def_color(name, r, g, b)
         index = next_available_color_pair_index
 
@@ -58,41 +66,55 @@ module Curses
         Curses.init_color(index, *colors_1000)
       end
 
+      # Create a color_pair definition by name. f_color and b_color are
+      # the foreground and background color respectively. They can either
+      # be an integer that represents a color that is already defined or
+      # it can be a String/Symbol of a color you have defined with
+      # def_color() method.
       def def_color_pair(name, f_color, b_color)
         index = next_available_color_pair_index
 
         @color_pair_name_to_index_mapping ||= {}
         @color_pair_name_to_index_mapping[name.to_sym] = index
 
-        f_color_i = color_lookup(f_color)
-        b_color_i = color_lookup(b_color)
+        # Try to find the integer representation of the inputs.
+        f_color_i = color_lookup(f_color) || f_color.to_i
+        b_color_i = color_lookup(b_color) || b_color.to_i
 
         Curses.init_pair(index, f_color_i, b_color_i)
       end
 
+      # The attribute bits for the color_pair you have previously defined
+      # with def_color_pair(). This can be used in curses attr methods
+      # like attron(Curses::Ext.color_pair_attr(:pretty_blue) | Curses::A_BOLD).
       def color_pair_attr(name)
          color_pair_lookup(name) << color_attr_bit_shift
       end
 
       private
 
+      # Lookup integer value for color with name as defined by def_color().
       def color_lookup(name)
-        if name.is_a?(String) || name.is_a?(Symbol)
-          key = name.to_sym
-          @color_name_to_index_mapping[key]
-        else
-          name
-        end
+        @color_name_to_index_mapping[name.to_sym]
       end
-
+      
+      # Lookup integer value for color_pair with name as defined by
+      # def_color_pair().
       def color_pair_lookup(name)
         @color_pair_name_to_index_mapping[name.to_sym] || 0
       end
 
+      # How many bits to shift the color integer value to get the correct
+      # curses attribute bits set. This is 8 on my system, maybe thats
+      # how it is on all systems, but this method should be able to
+      # determine that.
       def color_attr_bit_shift
         @color_attr_bit_shift ||= /(0*)\z/.match(Curses::A_COLOR.to_s(2)).captures[0].size
       end
 
+      # When defining colors with def_color() we need to assign an index
+      # for the defined color. This method will get the next available
+      # index.
       def next_available_color_index
         if @color_index
           @color_index += 1
@@ -101,6 +123,9 @@ module Curses
         end
       end
 
+      # When defining color_pairs with def_color_pair() we need to
+      # assign an index for the defined color_pair. This method will
+      # get the next available index.
       def next_available_color_pair_index
         if @color_pair_index
           @color_pair_index += 1
@@ -115,11 +140,15 @@ module Curses
         *item_names,
         **keyword_args
       )
+        # Created the actual Curses objects:
+        # 1. Item
+        # 2. Menu
         @curses_items_mapped_by_name = item_names.each_with_object({}) do |item_name, hash|
           hash[item_name] = Curses::Item.new(item_name, '')
         end
-
         @curses_menu = Curses::Menu.new(@curses_items_mapped_by_name.values)
+
+        # Create an Ext::Window as a container for this menu.
 
         # TODO: If given options has border: false, then we don't need top
         # padding I don't think.
@@ -127,6 +156,10 @@ module Curses
           sub_window_top_padding: 1
         }
 
+        # Since I didn't explicitly define and keyword args for this
+        # constructor, We need to extract certain keys that will be
+        # used as keyword arguments to the constructor of Ext::Window
+        # object.
         keyword_args_for_window = default_args_for_window.merge(
           keyword_args.slice(
             :height,
@@ -139,11 +172,20 @@ module Curses
             :extend_title_bar
           )
         )
+
+        # Create the Ext::Window from the options given to the Ext::Menu
+        # constructor.
         @ext_window = Curses::Ext::Window.new(
           **keyword_args_for_window
         )
 
-        @curses_menu.set_win(@ext_window.main_curses_window)
+        # Set the window for this menu to be the top_level_window from
+        # the Ext::Window.
+        @curses_menu.set_win(@ext_window.top_level_window)
+
+        # Set the sub_window for thsi menu to be the sub_window of the
+        # Ext::Window object. If there was not already a sub_window generated
+        # for the Ext::Window, then we'll generate one here.
         @curses_menu.set_sub(@ext_window.find_or_generate_sub_window)
       end
 
@@ -182,9 +224,6 @@ module Curses
 
     class Window
       BORDER_SIZE = 1
-
-      attr_reader :main_curses_window
-      attr_reader :sub_curses_window
 
       def initialize(
         height: nil,
@@ -226,7 +265,7 @@ module Curses
           @left
         )
 
-        # If we have a border, then we'll make a box-less subwindow that lives
+        # If we have a border, then we'll make a box-less sub_window that lives
         # inside of the main window.
         if has_border?
           @main_curses_window.box(0, 0)
@@ -237,6 +276,7 @@ module Curses
           @main_curses_window.keypad(true)
         end
 
+        # Print the title text in the title area.
         print_title(@title_text)
       end
 
@@ -282,10 +322,17 @@ module Curses
       end
 
       #
+      # Attribute Getters
+      #
+
+      def top_level_window
+        @main_curses_window
+      end
+
+      #
       # Override Curses::Window Methods
       #
 
-      # Refresh all windows this wrapper has.
       def refresh
         @main_curses_window.refresh
         @sub_curses_window.refresh if has_sub_window?
@@ -389,6 +436,9 @@ module Curses
       # Dimension Methods
       #
       
+      # We can recieve a fractional number for dimensions and positions.
+      # This will interpret those numbers such as 0.5 as being half the
+      # size or positioned halfway into the parent window.
       def calc_absolute_top
         if @top_literal
           if @top_literal.is_a?(Float) || @top_literal.is_a?(Rational)
