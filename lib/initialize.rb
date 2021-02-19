@@ -209,6 +209,8 @@ module Curses
       #
 
       def run_input_loop
+        @input_loop_death_flag = false
+
         loop do
           break if should_kill_input_loop?
 

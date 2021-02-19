@@ -21,6 +21,10 @@ module Dmti
       filenames_in_music_transcription_dir - filenames_in_database
     end
 
+    def songs_in_database
+      db.execute("SELECT * FROM songs ORDER BY name DESC")
+    end
+
     def init_db_schema
       db.execute(
         "CREATE TABLE IF NOT EXISTS songs(" \
