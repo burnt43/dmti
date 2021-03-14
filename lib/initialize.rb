@@ -49,7 +49,7 @@ module Curses
         Curses.use_default_colors
         Curses.raw
         Curses.noecho
-        Curses.curs_set(0)
+        Curses.curs_set(1)
       end
 
       # Create a color definition by name. Instead of the RGB values being
@@ -89,6 +89,10 @@ module Curses
       # like attron(Curses::Ext.color_pair_attr(:pretty_blue) | Curses::A_BOLD).
       def color_pair_attr(name)
          color_pair_lookup(name) << color_attr_bit_shift
+      end
+
+      def color_attr(name)
+        color_lookup(name) << color_attr_bit_shift
       end
 
       private
@@ -135,18 +139,119 @@ module Curses
       end
     end
 
+    class Form
+      def initialize(
+        *field_names,
+        **keyword_args
+      )
+        # Create the Window this form will reside in.
+        default_args_for_window = {
+          sub_window_top_padding: 1
+        }
+
+        keyword_args_for_window = default_args_for_window.merge(
+          keyword_args.slice(
+            :height,
+            :width,
+            :top,
+            :left,
+            :border,
+            :title_text,
+            :center_title,
+            :extend_title_bar
+          )
+        )
+
+        @ext_window = Curses::Ext::Window.new(
+          **keyword_args_for_window
+        )
+        menu_sub_window = @ext_window.find_or_generate_sub_window
+
+        # Make calculations for field labels and field positions
+        longest_field_name = field_names.map(&:size).max
+        field_x_offset = longest_field_name + 2
+        field_width = @ext_window.width - field_x_offset
+
+        @curses_fields_mapped_by_name = field_names.each_with_index.each_with_object({}) do |(field_name, index), hash|
+          # Place each field 1 per line. They will be offset by the longest
+          # field name so everything lines up. They will be as big as the
+          # remaining width of the window.
+          y_pos = index
+
+          field = Curses::Field.new(1, field_width, y_pos, field_x_offset, 0, 1)
+
+          # Use underline as decoration to imply that it is a place to type
+          # stuff into.
+          field.back = Curses::A_UNDERLINE
+          field.fore = Curses::A_UNDERLINE
+          field.set_buffer(0, '')
+
+          hash[field_name] = field
+        end
+
+        # Create the actual Curses Form and assign the windows it lives in.
+        @curses_form = Curses::Form.new(@curses_fields_mapped_by_name.values)
+        @curses_form.set_win(@ext_window.top_level_window)
+        @curses_form.set_sub(menu_sub_window)
+
+        # We need to show/post the menu before we can write the labels,
+        # otherwise the labels won't show up.
+        show
+
+        # Write the labels for the fields.
+        field_names.each_with_index do |field_name, index|
+          y_pos = index
+
+          @ext_window.setpos(y_pos, 0)
+          @ext_window << "#{field_name}:"
+        end
+      end
+
+      #
+      # Form Methods
+      #
+
+      def show
+        @curses_form.post
+      end
+
+      #
+      # Window Methods
+      #
+
+      def refresh
+        @ext_window.refresh
+      end
+
+      #
+      # Metaprogramming - Relay Methods
+      #
+
+      def method_missing(method_name, *args, &block)
+        @curses_form.send(method_name, *args, &block)
+      end
+    end
+
     class Menu
       def initialize(
-        *item_names,
+        *items,
         **keyword_args
       )
         # Created the actual Curses objects:
         # 1. Item
         # 2. Menu
-        @curses_items_mapped_by_name = item_names.each_with_object({}) do |item_name, hash|
-          hash[item_name] = Curses::Item.new(item_name, '')
+        @curses_items_mapped_by_name = items.each_with_object({}) do |item, hash|
+          item_name  = item[:name]
+          item_attrs = item[:attrs] || {}
+
+          hash[item_name] = {
+            curses_item: Curses::Item.new(item_name, ''),
+            attrs:       item_attrs
+          }
         end
-        @curses_menu = Curses::Menu.new(@curses_items_mapped_by_name.values)
+        @curses_menu = Curses::Menu.new(
+          @curses_items_mapped_by_name.values.map{|hash| hash[:curses_item]}
+        )
 
         # Create an Ext::Window as a container for this menu.
 
@@ -193,6 +298,8 @@ module Curses
         # we change it to be the amount of rows in the sub_win that this
         # menu lives in.
         @curses_menu.set_format(menu_sub_window.height, 1)
+
+        show
       end
 
       #
@@ -296,11 +403,11 @@ module Curses
       #
 
       def first_item_selected?
-        current_item == @curses_items_mapped_by_name.values[0]
+        current_item == @curses_items_mapped_by_name.values.dig(0, :curses_item)
       end
 
       def last_item_selected?
-        current_item == @curses_items_mapped_by_name.values[-1]
+        current_item == @curses_items_mapped_by_name.values.dig(-1, :curses_item)
       end
     end
 
@@ -409,6 +516,15 @@ module Curses
 
       def top_level_window
         @main_curses_window
+      end
+
+      #
+      #
+      #
+
+      def hide
+        @main_curses_window.clear
+        @sub_curses_window.clear if has_sub_window?
       end
 
       #

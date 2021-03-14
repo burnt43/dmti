@@ -39,35 +39,35 @@ Curses.noecho
 # main_window.refresh
 
 
-main_window = Curses.stdscr
-menu_window = main_window.derwin(
-  main_window.maxy - 2,
-  main_window.maxx - 2,
-  1, 1
-)
-main_window.box(0, 0)
-
-items = 25.times.map do |n|
-  Curses::Item.new("Item #{n}", '')
-end
-menu = Curses::Menu.new(items)
-
-menu.set_win(main_window)
-menu.set_sub(menu_window)
-
-main_window.refresh
-menu_window.refresh
-
-menu.post
-
-loop do
-  ch = main_window.getch
-
-  case ch
-  when 'q'
-    break
-  end
-end
+# main_window = Curses.stdscr
+# menu_window = main_window.derwin(
+#   main_window.maxy - 2,
+#   main_window.maxx - 2,
+#   1, 1
+# )
+# main_window.box(0, 0)
+# 
+# items = 25.times.map do |n|
+#   Curses::Item.new("Item #{n}", '')
+# end
+# menu = Curses::Menu.new(items)
+# 
+# menu.set_win(main_window)
+# menu.set_sub(menu_window)
+# 
+# main_window.refresh
+# menu_window.refresh
+# 
+# menu.post
+# 
+# loop do
+#   ch = main_window.getch
+# 
+#   case ch
+#   when 'q'
+#     break
+#   end
+# end
 
 =begin
 
