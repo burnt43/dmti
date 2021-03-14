@@ -2,8 +2,8 @@ require 'initialize'
 
 Curses::Ext.init
 
-Curses::Ext.def_color(:test_fg, 100, 200, 230)
-Curses::Ext.def_color(:test_bg, 50, 50, 50)
-Curses::Ext.def_color_pair(:test, :test_fg, :test_bg)
+Curses::Ext.def_color(:debug_fg, 230, 220, 50)
+Curses::Ext.def_color(:debug_bg, 0, 0, 0)
+Curses::Ext.def_color_pair(:debug, :debug_fg, :debug_bg)
 
 Dmti::WindowManager.new.run!

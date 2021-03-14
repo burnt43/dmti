@@ -460,10 +460,10 @@ module Curses
           @main_curses_window.box(0, 0)
 
           find_or_generate_sub_window
-          @sub_curses_window.keypad(true)
-        else
-          @main_curses_window.keypad(true)
         end
+
+        effective_window.keypad(true)
+        effective_window.scrollok(true)
 
         # Print the title text in the title area.
         print_title(@title_text)
@@ -475,10 +475,25 @@ module Curses
 
       # nlcr = New Line; Carriage Return
       def nlcr
-        new_y = cury + 1
-        new_x = 0
+        if on_bottom_line?
+          scroll
+          setpos(cury, 0)
+        else
+          new_y = cury + 1
+          new_x = 0
 
-        setpos(new_y, new_x)
+          setpos(new_y, new_x)
+        end
+      end
+
+      #
+      # Curses Attributes Methods
+      #
+
+      def with_attron(attr, &block)
+        attron(attr)
+        block.call
+        attroff(attr)
       end
 
       #
@@ -633,6 +648,10 @@ module Curses
       #
       # Dimension Methods
       #
+      
+      def on_bottom_line?
+        cury == maxy - 1
+      end
       
       # We can recieve a fractional number for dimensions and positions.
       # This will interpret those numbers such as 0.5 as being half the
