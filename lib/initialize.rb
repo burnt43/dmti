@@ -260,15 +260,13 @@ module Curses
 
           case ch
           when 'A'..'Z'
-            insch(ch)
+            insert_char(ch)
           when 'a'..'z'
-            insch(ch)
+            insert_char(ch)
           when '0'..'9'
-            insch(ch)
+            insert_char(ch)
           when Curses::Key::BACKSPACE
-            unless active_field.buffer_empty?
-              delch
-            end
+            delete_char
           when Curses::Key::F1
             break
           end
@@ -317,12 +315,13 @@ module Curses
         @curses_fields_mapped_by_name[@active_field_name]
       end
 
-      def insch(ch)
+      def insert_char(ch)
         active_field.insert_char(ch)
         driver(Curses::REQ_END_LINE)
       end
 
-      def delch
+      def delete_char
+        # TODO: need to update the buffer manually.
         driver(Curses::REQ_DEL_PREV)
       end
 
