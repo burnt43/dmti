@@ -33,6 +33,32 @@ module Curses
     end
   end
 
+  class Field
+    def insert_char(char)
+      char_as_string = char.chr
+
+      slim_buffer_value = current_buffer
+      slim_buffer_value << char_as_string
+      full_buffer_value = slim_buffer_value
+
+      set_buffer(0, full_buffer_value)
+    end
+
+    def max_buffer_size=(value)
+      @__max_buffer_size = value
+    end
+
+    private
+
+    def current_buffer
+      buffer(0).rstrip.clone
+    end
+
+    def buffer_empty?
+      current_buffer.empty?
+    end
+  end
+
   module Ext
     # Initial indexes when defining colors and color_pairs.
     # NOTE: I chose high-ish numbers because I don't want to override
@@ -49,7 +75,7 @@ module Curses
         Curses.use_default_colors
         Curses.raw
         Curses.noecho
-        Curses.curs_set(1)
+        Curses.curs_set(0)
       end
 
       # Create a color definition by name. Instead of the RGB values being
@@ -178,13 +204,13 @@ module Curses
           # remaining width of the window.
           y_pos = index
 
-          field = Curses::Field.new(1, field_width, y_pos, field_x_offset, 0, 1)
+          field = Curses::Field.new(1, field_width, y_pos, field_x_offset, 0, 0)
+          field.max_buffer_size = field_width
 
           # Use underline as decoration to imply that it is a place to type
           # stuff into.
           field.back = Curses::A_UNDERLINE
           field.fore = Curses::A_UNDERLINE
-          field.set_buffer(0, '')
 
           hash[field_name] = field
         end
@@ -193,6 +219,8 @@ module Curses
         @curses_form = Curses::Form.new(@curses_fields_mapped_by_name.values)
         @curses_form.set_win(@ext_window.top_level_window)
         @curses_form.set_sub(menu_sub_window)
+
+        @active_field_name = @curses_fields_mapped_by_name.keys[0]
 
         # We need to show/post the menu before we can write the labels,
         # otherwise the labels won't show up.
@@ -205,6 +233,54 @@ module Curses
           @ext_window.setpos(y_pos, 0)
           @ext_window << "#{field_name}:"
         end
+
+        # Set the cursor to the first position on the first field.
+        first_field_y_pos = 0
+        @ext_window.setpos(first_field_y_pos, field_x_offset)
+      end
+
+      #
+      # Input Loop Methods
+      #
+      
+      def define_input_loop_callback(ch, callback)
+        @input_loop_callbacks ||= {}
+        @input_loop_callbacks[ch] = callback
+      end
+
+      def run_input_loop
+        Curses.curs_set(1)
+
+        @input_loop_death_flag = false
+
+        loop do
+          break if should_kill_input_loop?
+
+          ch = getch
+
+          case ch
+          when 'A'..'Z'
+            insch(ch)
+          when 'a'..'z'
+            insch(ch)
+          when '0'..'9'
+            insch(ch)
+          when Curses::Key::BACKSPACE
+            unless active_field.buffer_empty?
+              delch
+            end
+          when Curses::Key::F1
+            break
+          end
+
+          run_input_loop_callback(ch)
+        end
+
+        Curses.curs_set(0)
+      end
+
+      def kill_input_loop!
+        @input_loop_death_flag = true
       end
 
       #
@@ -219,6 +295,10 @@ module Curses
       # Window Methods
       #
 
+      def getch
+        @ext_window.getch
+      end
+
       def refresh
         @ext_window.refresh
       end
@@ -229,6 +309,35 @@ module Curses
 
       def method_missing(method_name, *args, &block)
         @curses_form.send(method_name, *args, &block)
+      end
+
+      private
+
+      def active_field
+        @curses_fields_mapped_by_name[@active_field_name]
+      end
+
+      def insch(ch)
+        active_field.insert_char(ch)
+        driver(Curses::REQ_END_LINE)
+      end
+
+      def delch
+        driver(Curses::REQ_DEL_PREV)
+      end
+
+      #
+      # Input Loop Methods
+      #
+
+      def run_input_loop_callback(ch)
+        return unless @input_loop_callbacks
+
+        @input_loop_callbacks[ch]&.call(ch)
+      end
+
+      def should_kill_input_loop?
+        @input_loop_death_flag
       end
     end
 
@@ -334,9 +443,7 @@ module Curses
             end
           when 'l'
             selected_callback_lookup&.call
-          when 'q'
-            break
-          when 'x'
+          when Curses::Key::F1
             break
           end
         end
