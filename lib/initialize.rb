@@ -15,6 +15,10 @@ LazyConst::Config.base_dir = './lib'
 LazyConfig::Config.base_dir = "/home/#{`whoami`.strip}"
 
 module Curses
+  module Key
+    RETURN_KEY = 10
+  end
+
   class Window
     def height
       self.maxy
@@ -35,6 +39,8 @@ module Curses
 
   class Field
     def insert_char(char)
+      return if buffer_full?
+
       char_as_string = char.chr
 
       slim_buffer_value = current_buffer
@@ -42,6 +48,16 @@ module Curses
       full_buffer_value = slim_buffer_value
 
       set_buffer(0, full_buffer_value)
+    end
+
+    def delete_char
+      return if buffer_empty?
+
+      # Keep all but the last character.
+      new_buffer_value = current_buffer[0..-2]
+
+      # Update the buffer.
+      set_buffer(0, new_buffer_value)
     end
 
     def max_buffer_size=(value)
@@ -56,6 +72,10 @@ module Curses
 
     def buffer_empty?
       current_buffer.empty?
+    end
+
+    def buffer_full?
+      current_buffer.size == @__max_buffer_size - 1
     end
   end
 
@@ -220,7 +240,7 @@ module Curses
         @curses_form.set_win(@ext_window.top_level_window)
         @curses_form.set_sub(menu_sub_window)
 
-        @active_field_name = @curses_fields_mapped_by_name.keys[0]
+        @active_field_index = 0
 
         # We need to show/post the menu before we can write the labels,
         # otherwise the labels won't show up.
@@ -265,8 +285,14 @@ module Curses
             insert_char(ch)
           when '0'..'9'
             insert_char(ch)
+          when Curses::Key::UP
+            goto_prev_field
+          when Curses::Key::DOWN
+            goto_next_field
           when Curses::Key::BACKSPACE
             delete_char
+          when Curses::Key::RETURN_KEY
+            break
           when Curses::Key::F1
             break
           end
@@ -311,8 +337,12 @@ module Curses
 
       private
 
+      def active_field_name
+        @curses_fields_mapped_by_name.keys[@active_field_index]
+      end
+
       def active_field
-        @curses_fields_mapped_by_name[@active_field_name]
+        @curses_fields_mapped_by_name[active_field_name]
       end
 
       def insert_char(ch)
@@ -321,8 +351,34 @@ module Curses
       end
 
       def delete_char
-        # TODO: need to update the buffer manually.
-        driver(Curses::REQ_DEL_PREV)
+        active_field.delete_char 
+        driver(Curses::REQ_END_FIELD)
+      end
+
+      def goto_prev_field
+        return if on_first_field?
+
+        @active_field_index -= 1
+
+        driver(Curses::REQ_PREV_FIELD)
+        driver(Curses::REQ_END_FIELD)
+      end
+
+      def goto_next_field
+        return if on_last_field?
+
+        @active_field_index += 1
+
+        driver(Curses::REQ_NEXT_FIELD)
+        driver(Curses::REQ_END_FIELD)
+      end
+
+      def on_first_field?
+        @active_field_index.zero?
+      end
+
+      def on_last_field?
+        @active_field_index == @curses_fields_mapped_by_name.size - 1
       end
 
       #
