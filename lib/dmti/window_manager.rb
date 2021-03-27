@@ -2,8 +2,8 @@ module Dmti
   class WindowManager
     def initialize
       menu_x_division                 = 0.3
-      song_list_y_relative_division   = 0.8
-      status_y_division               = 0.9
+      song_list_y_relative_division   = 0.5
+      status_y_division               = 0.7
 
       @state = :main_menu_active
       @current_filename = nil
@@ -75,47 +75,87 @@ module Dmti
             print_info("Current File: #{@current_filename}")
             refresh_status_window
 
-            # Refresh to the cursor will be active on this window to let
-            # the user know to enter data.
-            @song_record_form.refresh
-            @song_record_form.run_input_loop
+            focus_song_record_form
           end
         end
       })
 
-      @song_record_form.define_input_loop_callback('a', ->(ch) {
-        mapping = @song_record_form.instance_eval { @curses_fields_mapped_by_name }
-        mapping.each do |name, field|
-          print_debug("Field(#{name}): #{field.buffer(0).strip.size} #{field.buffer(0).strip}")
-        end
-
-        refresh_status_window
+      @song_record_menu.def_selected_callback('Add Song to File', -> {
       })
+
+      @song_record_menu.def_selected_callback('Next File', -> {
+      })
+
+      @song_record_form.define_form_complete_callback ->(field_values) {
+        create_song_mapping(field_values)
+
+        unfocus_song_record_form
+
+        print_debug(field_values.to_s)
+        refresh_status_window
+
+        focus_song_record_menu
+      }
     end
 
     def run!
-      @main_menu.refresh
       @song_record_menu.refresh
       @song_record_form.refresh
       @status_window.refresh
 
-      @song_list_window.setpos(0,0)
-      @song_list_window << "@main_menu.item_count: #{@main_menu.item_count}"
-      @song_list_window.nlcr
-      @song_list_window << "@main_menu.opts: #{@main_menu.opts}"
-      @song_list_window.nlcr
-      @song_list_window << "@main_menu.scale: #{@main_menu.scale}"
-      @song_list_window.refresh
-
-
-      @main_menu.run_input_loop
+      focus_main_menu
     end
 
     private
 
+    def create_song_mapping(field_values)
+      column_attributes = {
+        name:       field_values['Song Name'],
+        page_index: field_values['Page Number'],
+        filename:   @current_filename
+      }
+
+      Dmti.create_song_mapping(column_attributes)
+    end
+
+    #
+    # Focus/Unfocus Song Record Form Methods
+    #
+
+    def focus_main_menu
+      @main_menu.refresh
+      @main_menu.run_input_loop
+    end
+
+    #
+    # Focus/Unfocus Song Record Form Methods
+    #
+
+    def unfocus_song_record_form
+      @song_record_form.kill_input_loop!
+    end
+
+    def focus_song_record_form
+      @song_record_form.refresh
+      @song_record_form.run_input_loop
+    end
+
+    #
+    # Focus/Unfocus Song Record Menu Methods
+    #
+
+    def focus_song_record_menu
+      @song_record_menu.refresh
+      @song_record_menu.run_input_loop
+    end
+
     def refresh_status_window
       @status_window.refresh
     end
+
+    #
+    # Print to Status Window Methods
+    #
 
     def print_debug(msg)
       print_msg(msg, type_name: 'DEBUG', type_color_pair_name: :debug)

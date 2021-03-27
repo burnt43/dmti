@@ -17,6 +17,7 @@ LazyConfig::Config.base_dir = "/home/#{`whoami`.strip}"
 module Curses
   module Key
     RETURN_KEY = 10
+    SPACEBAR = 32
   end
 
   class Window
@@ -64,11 +65,11 @@ module Curses
       @__max_buffer_size = value
     end
 
-    private
-
     def current_buffer
       buffer(0).rstrip.clone
     end
+
+    private
 
     def buffer_empty?
       current_buffer.empty?
@@ -183,7 +184,7 @@ module Curses
           @color_pair_index = FIRST_COLOR_PAIR_INDEX
         end
       end
-    end
+    end # class << self
 
     class Form
       def initialize(
@@ -260,6 +261,15 @@ module Curses
       end
 
       #
+      # Callback Methods
+      #
+
+      def define_form_complete_callback(callback_lambda)
+        @callbacks ||= {}
+        @callbacks[:form_complete] = callback_lambda
+      end
+
+      #
       # Input Loop Methods
       #
       
@@ -278,12 +288,16 @@ module Curses
 
           ch = getch
 
+          # TODO: make this an before callback
+
           case ch
           when 'A'..'Z'
             insert_char(ch)
           when 'a'..'z'
             insert_char(ch)
           when '0'..'9'
+            insert_char(ch)
+          when '_'
             insert_char(ch)
           when Curses::Key::UP
             goto_prev_field
@@ -292,11 +306,12 @@ module Curses
           when Curses::Key::BACKSPACE
             delete_char
           when Curses::Key::RETURN_KEY
-            break
+            run_form_complete_callback!
           when Curses::Key::F1
             break
           end
 
+          # TODO: make this an after process
           run_input_loop_callback(ch)
         end
 
@@ -336,6 +351,31 @@ module Curses
       end
 
       private
+
+      #
+      # Callback Methods
+      #
+
+      def run_form_complete_callback!
+        return unless @callbacks
+        return unless @callbacks[:form_complete]
+
+        @callbacks[:form_complete].call(field_values)
+      end
+
+      #
+      # Form Methods
+      #
+
+      def field_values
+        @curses_fields_mapped_by_name.transform_values do |field|
+          field.current_buffer
+        end
+      end
+
+      #
+      # Field Methods
+      #
 
       def active_field_name
         @curses_fields_mapped_by_name.keys[@active_field_index]
@@ -394,7 +434,7 @@ module Curses
       def should_kill_input_loop?
         @input_loop_death_flag
       end
-    end
+    end # Form
 
     class Menu
       def initialize(
@@ -488,15 +528,15 @@ module Curses
           ch = getch
 
           case ch
-          when 'j'
+          when 'j', Curses::Key::DOWN
             unless last_item_selected?
               down_item
             end
-          when 'k'
+          when 'k', Curses::Key::UP
             unless first_item_selected?
               up_item
             end
-          when 'l'
+          when Curses::Key::RETURN_KEY
             selected_callback_lookup&.call
           when Curses::Key::F1
             break

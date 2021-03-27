@@ -34,5 +34,20 @@ module Dmti
         ")"
       )
     end
+
+    # Insert record into the song table.
+    def create_song_mapping!(attrs)
+      query = StringIO.new.tap do |s|
+        s.print('INSERT INTO songs ')
+        s.print('(name, filename, page_index) ')
+        s.print('VALUES (')
+        s.print("\"#{attrs[:name]}\",")
+        s.print("\"#{attrs[:filename]}\",")
+        s.print("#{attrs[:page_index]}")
+        s.print(');')
+      end.string
+
+      db.execute(query)
+    end
   end
 end
