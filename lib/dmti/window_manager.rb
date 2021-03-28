@@ -96,9 +96,10 @@ module Dmti
       # song_menu callbacks
       #
 
+      # Add a way to escape back to the main_menu.
       @song_menu.define_after_input_loop_callback ->(ch) {
         case ch
-        when Curses::Key::ESCAPE
+        when Curses::Key::ESCAPE, Curses::Key::LEFT
           unfocus_song_menu
           focus_main_menu
         end
@@ -118,24 +119,28 @@ module Dmti
       # song_form callbacks
       #
 
-      @song_form.define_before_input_loop_callback ->(ch) {
-        if ch.is_a?(String)
-          print_debug("typed: #{ch}(#{ch.unpack('C*')[0]})", refresh: true)
-        elsif ch.is_a?(Integer)
-          print_debug("typed: (#{ch})", refresh: true)
-        end
+      # NOTE: This is jsut debugging what curses gives to use from getch.
+      # @song_form.define_before_input_loop_callback ->(ch) {
+      #   if ch.is_a?(String)
+      #     print_debug("typed: #{ch}(#{ch.unpack('C*')[0]})", refresh: true)
+      #   elsif ch.is_a?(Integer)
+      #     print_debug("typed: (#{ch})", refresh: true)
+      #   end
 
-        focus_song_form
-      }
+      #   focus_song_form
+      # }
 
+      # Add a way to escape back to the main_menu.
       @song_form.define_after_input_loop_callback ->(ch) {
         case ch
-        when Curses::Key::ESCAPE
+        when Curses::Key::ESCAPE, Curses::Key::LEFT
+          # TODO: add a clear form method to clear the values.
           unfocus_song_form
           focus_main_menu
         end
       }
 
+      # Add a way to process when the user completes the song_form.
       @song_form.define_form_complete_callback ->(field_values) {
         create_song_mapping(field_values)
 

@@ -538,9 +538,10 @@ module Curses
       # Callback Methods
       #
 
-      def def_selected_callback(item_name, lambda_callback)
-        @selected_callbacks ||= {}
-        @selected_callbacks[item_name] = lambda_callback
+      def def_selected_callback(item_name, callback_lambda)
+        @callbacks ||= {}
+        @callbacks[:item_selected] ||= {}
+        @callbacks[:item_selected][item_name] = callback_lambda
       end
 
       def define_before_input_loop_callback(callback_lambda)
@@ -587,7 +588,7 @@ module Curses
               up_item
             end
           when Curses::Key::RETURN_KEY
-            selected_callback_lookup&.call
+            run_selected_item_callback!
           when Curses::Key::F1
             break
           end
@@ -639,24 +640,25 @@ module Curses
       # Callback Methods
       #
 
-      def selected_callback_lookup
-        return unless @selected_callbacks
+      def run_selected_item_callback!
+        return unless @callbacks
+        return unless @callbacks[:item_selected]
 
-        @selected_callbacks[current_item&.name]
+        @callbacks.dig(:item_selected, current_item&.name)&.call
       end
 
       def run_before_input_loop_callback!(ch)
         return unless @callbacks
         return unless @callbacks[:before_input_loop]
 
-        @callbacks[:before_input_loop].call(ch)
+        @callbacks[:before_input_loop]&.call(ch)
       end
 
       def run_after_input_loop_callback!(ch)
         return unless @callbacks
         return unless @callbacks[:after_input_loop]
 
-        @callbacks[:after_input_loop].call(ch)
+        @callbacks[:after_input_loop]&.call(ch)
       end
 
       #
