@@ -17,7 +17,8 @@ LazyConfig::Config.base_dir = "/home/#{`whoami`.strip}"
 module Curses
   module Key
     RETURN_KEY = 10
-    SPACEBAR = 32
+    ESCAPE     = 27
+    SPACEBAR   = 32
   end
 
   class Window
@@ -269,26 +270,39 @@ module Curses
         @callbacks[:form_complete] = callback_lambda
       end
 
+      def define_before_input_loop_callback(callback_lambda)
+        @callbacks ||= {}
+        @callbacks[:before_input_loop] = callback_lambda
+      end
+
+      def define_after_input_loop_callback(callback_lambda)
+        @callbacks ||= {}
+        @callbacks[:after_input_loop] = callback_lambda
+      end
+
       #
       # Input Loop Methods
       #
-      
-      def define_input_loop_callback(ch, callback)
-        @input_loop_callbacks ||= {}
-        @input_loop_callbacks[ch] = callback
+
+      def input_loop_already_running?
+        @running_input_loop
       end
 
       def run_input_loop
-        Curses.curs_set(1)
+        return if input_loop_already_running?
 
+        @running_input_loop = true
         @input_loop_death_flag = false
 
         loop do
-          break if should_kill_input_loop?
+          if should_kill_input_loop?
+            @running_input_loop = false
+            break
+          end
 
           ch = getch
 
-          # TODO: make this an before callback
+          run_before_input_loop_callback!(ch)
 
           case ch
           when 'A'..'Z'
@@ -311,14 +325,12 @@ module Curses
             break
           end
 
-          # TODO: make this an after process
-          run_input_loop_callback(ch)
+          run_after_input_loop_callback!(ch)
         end
-
-        Curses.curs_set(0)
       end
 
       def kill_input_loop!
+        @running_input_loop = false
         @input_loop_death_flag = true
       end
 
@@ -361,6 +373,20 @@ module Curses
         return unless @callbacks[:form_complete]
 
         @callbacks[:form_complete].call(field_values)
+      end
+
+      def run_before_input_loop_callback!(ch)
+        return unless @callbacks
+        return unless @callbacks[:before_input_loop]
+
+        @callbacks[:before_input_loop].call(ch)
+      end
+
+      def run_after_input_loop_callback!(ch)
+        return unless @callbacks
+        return unless @callbacks[:after_input_loop]
+
+        @callbacks[:after_input_loop].call(ch)
       end
 
       #
@@ -503,6 +529,8 @@ module Curses
         # menu lives in.
         @curses_menu.set_format(menu_sub_window.height, 1)
 
+        @running_input_loop = false
+
         show
       end
 
@@ -515,17 +543,39 @@ module Curses
         @selected_callbacks[item_name] = lambda_callback
       end
 
+      def define_before_input_loop_callback(callback_lambda)
+        @callbacks ||= {}
+        @callbacks[:before_input_loop] = callback_lambda
+      end
+
+      def define_after_input_loop_callback(callback_lambda)
+        @callbacks ||= {}
+        @callbacks[:after_input_loop] = callback_lambda
+      end
+
       #
       # Input Loop Methods
       #
 
+      def input_loop_already_running?
+        @running_input_loop
+      end
+
       def run_input_loop
+        return if input_loop_already_running?
+
+        @running_input_loop = true
         @input_loop_death_flag = false
 
         loop do
-          break if should_kill_input_loop?
+          if should_kill_input_loop?
+            @running_input_loop = false
+            break
+          end
 
           ch = getch
+
+          run_before_input_loop_callback!(ch)
 
           case ch
           when 'j', Curses::Key::DOWN
@@ -541,10 +591,13 @@ module Curses
           when Curses::Key::F1
             break
           end
+
+          run_after_input_loop_callback!(ch)
         end
       end
 
       def kill_input_loop!
+        @running_input_loop = false
         @input_loop_death_flag = true
       end
 
@@ -590,6 +643,20 @@ module Curses
         return unless @selected_callbacks
 
         @selected_callbacks[current_item&.name]
+      end
+
+      def run_before_input_loop_callback!(ch)
+        return unless @callbacks
+        return unless @callbacks[:before_input_loop]
+
+        @callbacks[:before_input_loop].call(ch)
+      end
+
+      def run_after_input_loop_callback!(ch)
+        return unless @callbacks
+        return unless @callbacks[:after_input_loop]
+
+        @callbacks[:after_input_loop].call(ch)
       end
 
       #

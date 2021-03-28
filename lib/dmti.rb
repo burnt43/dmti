@@ -21,8 +21,8 @@ module Dmti
       filenames_in_music_transcription_dir - filenames_in_database
     end
 
-    def songs_in_database
-      db.execute("SELECT * FROM songs ORDER BY name DESC")
+    def songs_in_db
+      db.execute("SELECT * FROM songs ORDER BY name ASC")
     end
 
     def init_db_schema
