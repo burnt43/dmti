@@ -183,6 +183,7 @@ module Dmti
 
     def focus_main_menu
       Curses.curs_set(0)
+      @main_menu.keep_alive_input_loop!
       @main_menu.refresh
       @main_menu.run_input_loop
     end
@@ -197,6 +198,7 @@ module Dmti
 
     def focus_song_menu
       Curses.curs_set(0)
+      @song_menu.keep_alive_input_loop!
       @song_menu.refresh
       @song_menu.run_input_loop
     end
@@ -211,6 +213,7 @@ module Dmti
 
     def focus_song_form
       Curses.curs_set(1)
+      @song_form.keep_alive_input_loop!
       @song_form.refresh
       @song_form.run_input_loop
     end
@@ -221,6 +224,7 @@ module Dmti
 
     def focus_song_map_menu
       Curses.curs_set(0)
+      @song_map_menu.keep_alive_input_loop!
       @song_map_menu.refresh
       @song_map_menu.run_input_loop
     end

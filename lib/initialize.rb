@@ -284,15 +284,11 @@ module Curses
       # Input Loop Methods
       #
 
-      def input_loop_already_running?
-        @running_input_loop
-      end
-
       def run_input_loop
         return if input_loop_already_running?
 
         @running_input_loop = true
-        @input_loop_death_flag = false
+        keep_alive_input_loop!
 
         loop do
           if should_kill_input_loop?
@@ -330,8 +326,11 @@ module Curses
       end
 
       def kill_input_loop!
-        @running_input_loop = false
         @input_loop_death_flag = true
+      end
+
+      def keep_alive_input_loop!
+        @input_loop_death_flag = false
       end
 
       #
@@ -451,6 +450,10 @@ module Curses
       # Input Loop Methods
       #
 
+      def input_loop_already_running?
+        @running_input_loop
+      end
+
       def run_input_loop_callback(ch)
         return unless @input_loop_callbacks
 
@@ -558,15 +561,11 @@ module Curses
       # Input Loop Methods
       #
 
-      def input_loop_already_running?
-        @running_input_loop
-      end
-
       def run_input_loop
         return if input_loop_already_running?
 
         @running_input_loop = true
-        @input_loop_death_flag = false
+        keep_alive_input_loop!
 
         loop do
           if should_kill_input_loop?
@@ -598,8 +597,11 @@ module Curses
       end
 
       def kill_input_loop!
-        @running_input_loop = false
         @input_loop_death_flag = true
+      end
+
+      def keep_alive_input_loop!
+        @input_loop_death_flag = false
       end
 
       #
@@ -664,6 +666,10 @@ module Curses
       #
       # Input Loop Methods
       #
+
+      def input_loop_already_running?
+        @running_input_loop
+      end
 
       def should_kill_input_loop?
         @input_loop_death_flag
