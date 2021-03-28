@@ -37,6 +37,12 @@ module Curses
     def minx
       0
     end
+
+    def with_attron(attr, &block)
+      attron(attr)
+      block.call
+      attroff(attr)
+    end
   end
 
   class Field
@@ -206,7 +212,8 @@ module Curses
             :border,
             :title_text,
             :center_title,
-            :extend_title_bar
+            :extend_title_bar,
+            :highlight_color_pair
           )
         )
 
@@ -342,23 +349,26 @@ module Curses
       end
 
       #
-      # Window Methods
-      #
-
-      def getch
-        @ext_window.getch
-      end
-
-      def refresh
-        @ext_window.refresh
-      end
-
-      #
       # Metaprogramming - Relay Methods
       #
 
+      RELAY_ROUTING = {
+        getch:       :@ext_window,
+        refresh:     :@ext_window,
+        draw_border: :@ext_window,
+      }
+
       def method_missing(method_name, *args, &block)
-        @curses_form.send(method_name, *args, &block)
+        instance_variable_name = RELAY_ROUTING[method_name]
+
+        object =
+          if instance_variable_name
+            instance_variable_get(instance_variable_name)
+          else
+            @curses_form
+          end
+
+        object.send(method_name, *args, &block)
       end
 
       private
@@ -507,7 +517,8 @@ module Curses
             :border,
             :title_text,
             :center_title,
-            :extend_title_bar
+            :extend_title_bar,
+            :highlight_color_pair
           )
         )
 
@@ -617,23 +628,26 @@ module Curses
       end
 
       #
-      # Window Methods
-      #
-
-      def getch
-        @ext_window.getch
-      end
-
-      def refresh
-        @ext_window.refresh
-      end
-
-      #
       # Metaprogramming - Relay Methods
       #
 
+      RELAY_ROUTING = {
+        getch:       :@ext_window,
+        refresh:     :@ext_window,
+        draw_border: :@ext_window,
+      }
+
       def method_missing(method_name, *args, &block)
-        @curses_menu.send(method_name, *args, &block)
+        instance_variable_name = RELAY_ROUTING[method_name]
+
+        object =
+          if instance_variable_name
+            instance_variable_get(instance_variable_name)
+          else
+            @curses_menu
+          end
+
+        object.send(method_name, *args, &block)
       end
 
       private
@@ -686,7 +700,7 @@ module Curses
       def last_item_selected?
         current_item == @curses_items_mapped_by_name.values.dig(-1, :curses_item)
       end
-    end
+    end # Menu
 
     class Window
       BORDER_SIZE = 1
@@ -700,7 +714,8 @@ module Curses
         border: true,
         title_text: 'Title',
         center_title: true,
-        extend_title_bar: true
+        extend_title_bar: true,
+        highlight_color_pair: nil
       )
         @parent_window = Curses.stdscr
 
@@ -731,19 +746,12 @@ module Curses
           @left
         )
 
-        # If we have a border, then we'll make a box-less sub_window that lives
-        # inside of the main window.
-        if has_border?
-          @main_curses_window.box(0, 0)
-
-          find_or_generate_sub_window
-        end
+        find_or_generate_sub_window if has_border?
 
         effective_window.keypad(true)
         effective_window.scrollok(true)
 
-        # Print the title text in the title area.
-        print_title(@title_text)
+        draw_border
       end
 
       #
@@ -761,16 +769,6 @@ module Curses
 
           setpos(new_y, new_x)
         end
-      end
-
-      #
-      # Curses Attributes Methods
-      #
-
-      def with_attron(attr, &block)
-        attron(attr)
-        block.call
-        attroff(attr)
       end
 
       #
@@ -803,20 +801,35 @@ module Curses
       end
 
       #
+      # Window Methods
+      #
+
+      def draw_border(highlight: false)
+        work = -> {
+          @main_curses_window.box(0, 0)
+          print_title(@title_text)
+        }
+
+        if highlight
+          @main_curses_window.with_attron(Curses::Ext.color_pair_attr(:info)) do
+            work.call
+          end
+        else
+          work.call
+        end
+      end
+
+      def hide
+        @main_curses_window.clear
+        @sub_curses_window.clear if has_sub_window?
+      end
+
+      #
       # Attribute Getters
       #
 
       def top_level_window
         @main_curses_window
-      end
-
-      #
-      #
-      #
-
-      def hide
-        @main_curses_window.clear
-        @sub_curses_window.clear if has_sub_window?
       end
 
       #
@@ -877,45 +890,43 @@ module Curses
       def print_title(title)
         return unless has_border?
 
-        @main_curses_window.attron(Curses::A_STANDOUT)
+        @main_curses_window.with_attron(Curses::A_STANDOUT) do
+          if center_title?
+            # Figure out how much whitespace should go on the left and right
+            # of the string so we know where to place the string so it appears
+            # centered.
+            total_ws_chars = @sub_curses_window.width - title.length 
+            left_ws_chars = (total_ws_chars / 2.0).floor
+            right_ws_chars = (total_ws_chars / 2.0).ceil
 
-        if center_title?
-          # Figure out how much whitespace should go on the left and right
-          # of the string so we know where to place the string so it appears
-          # centered.
-          total_ws_chars = @sub_curses_window.width - title.length 
-          left_ws_chars = (total_ws_chars / 2.0).floor
-          right_ws_chars = (total_ws_chars / 2.0).ceil
+            if extended_title_bar?
+              # Add whitespace chars to the title on left and right to
+              # be centered.
+              my_title_text = (' ' * left_ws_chars) + title + (' ' * right_ws_chars)
 
-          if extended_title_bar?
-            # Add whitespace chars to the title on left and right to
-            # be centered.
-            my_title_text = (' ' * left_ws_chars) + title + (' ' * right_ws_chars)
-
-            @main_curses_window.setpos(0, BORDER_SIZE)
-            @main_curses_window << my_title_text
+              @main_curses_window.setpos(0, BORDER_SIZE)
+              @main_curses_window << my_title_text
+            else
+              # Set the position based on how much whitespace should be on the
+              # left of the string, even though we are not outputing any white
+              # space chars.
+              @main_curses_window.setpos(0, BORDER_SIZE + left_ws_chars)
+              @main_curses_window << @title_text
+            end
           else
-            # Set the position based on how much whitespace should be on the
-            # left of the string, even though we are not outputing any white
-            # space chars.
-            @main_curses_window.setpos(0, BORDER_SIZE + left_ws_chars)
-            @main_curses_window << @title_text
-          end
-        else
-          if extended_title_bar?
-            # Add whitespace until the end of the title space.
-            my_title_text = title + (' ' * (@sub_curses_window.width - title.size))
+            if extended_title_bar?
+              # Add whitespace until the end of the title space.
+              my_title_text = title + (' ' * (@sub_curses_window.width - title.size))
 
-            @main_curses_window.setpos(0, BORDER_SIZE)
-            @main_curses_window << my_title_text
-          else
-            # Just print the string as is in the top left of the title area.
-            @main_curses_window.setpos(0, BORDER_SIZE)
-            @main_curses_window << @title_text
+              @main_curses_window.setpos(0, BORDER_SIZE)
+              @main_curses_window << my_title_text
+            else
+              # Just print the string as is in the top left of the title area.
+              @main_curses_window.setpos(0, BORDER_SIZE)
+              @main_curses_window << @title_text
+            end
           end
         end
-
-        @main_curses_window.attroff(Curses::A_STANDOUT)
       end
 
       def effective_window

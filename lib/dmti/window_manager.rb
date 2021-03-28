@@ -5,25 +5,26 @@ module Dmti
       song_list_y_relative_division   = 0.5
       status_y_division               = 0.7
 
-      @state = :main_menu_active
       @current_filename = nil
 
       # Left Side
       @main_menu = Curses::Ext::Menu.new(
         {name: 'Song List'},
         {name: 'Scan Files'},
-        width:      menu_x_division,
-        height:     song_list_y_relative_division,
-        title_text: 'Menu'
+        width:                menu_x_division,
+        height:               song_list_y_relative_division,
+        title_text:           'Menu',
+        highlight_color_pair: :debug
       )
 
       @song_map_menu = Curses::Ext::Menu.new(
         {name: 'Add Song to File'},
         {name: 'Next File'},
-        top:        song_list_y_relative_division,
-        height:     status_y_division - song_list_y_relative_division,
-        width:      menu_x_division,
-        title_text: 'Song Mapper'
+        top:                  song_list_y_relative_division,
+        height:               status_y_division - song_list_y_relative_division,
+        width:                menu_x_division,
+        title_text:           'Song Mapper',
+        highlight_color_pair: :debug
       )
 
       # Right Side
@@ -40,20 +41,22 @@ module Dmti
 
       @song_menu = Curses::Ext::Menu.new(
         *song_menu_items,
-        left:       menu_x_division,
-        height:     song_list_y_relative_division,
-        width:      1 - menu_x_division,
-        title_text: 'Song List'
+        left:                 menu_x_division,
+        height:               song_list_y_relative_division,
+        width:                1 - menu_x_division,
+        title_text:           'Song List',
+        highlight_color_pair: :debug
       )
 
       @song_form = Curses::Ext::Form.new(
         'Song Name',
         'Page Number',
-        top:        song_list_y_relative_division,
-        left:       menu_x_division,
-        height:     status_y_division - song_list_y_relative_division,
-        width:      1 - menu_x_division,
-        title_text: 'Song Mapper'
+        top:                  song_list_y_relative_division,
+        left:                 menu_x_division,
+        height:               status_y_division - song_list_y_relative_division,
+        width:                1 - menu_x_division,
+        title_text:           'Song Mapper',
+        highlight_color_pair: :debug
       )
 
       # Bottom
@@ -70,25 +73,24 @@ module Dmti
       })
 
       @main_menu.def_selected_callback('Scan Files', ->{
-        case @state
-        when :main_menu_active
-          # Stop reading in put on the main_menu.
-          @main_menu.kill_input_loop!
+        unfocus_main_menu
 
-          # Find the files that are not added to the DB.
-          print_debug('Scanning for missing files...')
-          missing_filenames = Dmti.filenames_missing_in_database
+        # Stop reading in put on the main_menu.
+        @main_menu.kill_input_loop!
 
-          # Show how many files we've found.
-          print_info("Found #{missing_filenames.size} new files.")
+        # Find the files that are not added to the DB.
+        print_debug('Scanning for missing files...')
+        missing_filenames = Dmti.filenames_missing_in_database
 
-          #
-          missing_filenames.each do |missing_filename|
-            @current_filename = missing_filename
-            print_info("Current File: #{@current_filename}", refresh: true)
+        # Show how many files we've found.
+        print_info("Found #{missing_filenames.size} new files.")
 
-            focus_song_form
-          end
+        #
+        missing_filenames.each do |missing_filename|
+          @current_filename = missing_filename
+          print_info("Current File: #{@current_filename}", refresh: true)
+
+          focus_song_form
         end
       })
 
@@ -179,11 +181,14 @@ module Dmti
 
     def unfocus_main_menu
       @main_menu.kill_input_loop!
+      @main_menu.draw_border(highlight: false)
+      @main_menu.refresh
     end
 
     def focus_main_menu
       Curses.curs_set(0)
       @main_menu.keep_alive_input_loop!
+      @main_menu.draw_border(highlight: true)
       @main_menu.refresh
       @main_menu.run_input_loop
     end
@@ -194,11 +199,14 @@ module Dmti
 
     def unfocus_song_menu
       @song_menu.kill_input_loop!
+      @song_menu.draw_border(highlight: false)
+      @song_menu.refresh
     end
 
     def focus_song_menu
       Curses.curs_set(0)
       @song_menu.keep_alive_input_loop!
+      @song_menu.draw_border(highlight: true)
       @song_menu.refresh
       @song_menu.run_input_loop
     end
@@ -209,11 +217,14 @@ module Dmti
 
     def unfocus_song_form
       @song_form.kill_input_loop!
+      @song_form.draw_border(highlight: false)
+      @song_form.refresh
     end
 
     def focus_song_form
       Curses.curs_set(1)
       @song_form.keep_alive_input_loop!
+      @song_form.draw_border(highlight: true)
       @song_form.refresh
       @song_form.run_input_loop
     end
@@ -222,9 +233,16 @@ module Dmti
     # Focus/Unfocus song_map Methods
     #
 
+    def unfocus_song_map_menu
+      @song_map_menu.kill_input_loop!
+      @song_map_menu.draw_border(highlight: false)
+      @song_map_menu.refresh
+    end
+
     def focus_song_map_menu
       Curses.curs_set(0)
       @song_map_menu.keep_alive_input_loop!
+      @song_map_menu.draw_border(highlight: true)
       @song_map_menu.refresh
       @song_map_menu.run_input_loop
     end
