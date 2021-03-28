@@ -732,6 +732,8 @@ module Curses
         @center_title = center_title
         @extend_title_bar = extend_title_bar
 
+        @highlight_color_pair = highlight_color_pair
+
         # Calculate dimensions from input.
         @top = calc_absolute_top
         @left = calc_absolute_left
@@ -810,8 +812,8 @@ module Curses
           print_title(@title_text)
         }
 
-        if highlight
-          @main_curses_window.with_attron(Curses::Ext.color_pair_attr(:info)) do
+        if @highlight_color_pair && highlight
+          @main_curses_window.with_attron(Curses::Ext.color_pair_attr(@highlight_color_pair)) do
             work.call
           end
         else

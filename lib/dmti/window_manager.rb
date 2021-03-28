@@ -11,10 +11,11 @@ module Dmti
       @main_menu = Curses::Ext::Menu.new(
         {name: 'Song List'},
         {name: 'Scan Files'},
+        {name: 'Quit'},
         width:                menu_x_division,
         height:               song_list_y_relative_division,
         title_text:           'Menu',
-        highlight_color_pair: :debug
+        highlight_color_pair: :window_highlight
       )
 
       @song_map_menu = Curses::Ext::Menu.new(
@@ -24,7 +25,7 @@ module Dmti
         height:               status_y_division - song_list_y_relative_division,
         width:                menu_x_division,
         title_text:           'Song Mapper',
-        highlight_color_pair: :debug
+        highlight_color_pair: :window_highlight
       )
 
       # Right Side
@@ -45,7 +46,7 @@ module Dmti
         height:               song_list_y_relative_division,
         width:                1 - menu_x_division,
         title_text:           'Song List',
-        highlight_color_pair: :debug
+        highlight_color_pair: :window_highlight
       )
 
       @song_form = Curses::Ext::Form.new(
@@ -56,7 +57,7 @@ module Dmti
         height:               status_y_division - song_list_y_relative_division,
         width:                1 - menu_x_division,
         title_text:           'Song Mapper',
-        highlight_color_pair: :debug
+        highlight_color_pair: :window_highlight
       )
 
       # Bottom
@@ -92,6 +93,10 @@ module Dmti
 
           focus_song_form
         end
+      })
+
+      @main_menu.def_selected_callback('Quit', ->{
+        @main_menu.kill_input_loop!
       })
 
       #
