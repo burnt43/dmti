@@ -1,3 +1,6 @@
+# TODO: Add command line options.
+# 1. For song only mode
+# 2. Blow up the database on startup (for testing)
 module Dmti
   class << self
     def db
@@ -17,6 +20,7 @@ module Dmti
       ).to_set
     end
 
+    # TODO: I don't think this works correctly.
     def filenames_missing_in_database
       filenames_in_music_transcription_dir - filenames_in_database
     end

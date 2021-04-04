@@ -153,6 +153,11 @@ module Dmti
 
       # Add a way to process when the user completes the song_form.
       @song_form.define_form_complete_callback ->(field_values) {
+        # TODO: validate the field_values
+
+        # TODO: be able to highlight field value labels when there is an error
+
+        # TODO: fix this method. the name is different now i think.
         # create_song_mapping(field_values)
 
         unfocus_song_form
