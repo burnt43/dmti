@@ -50,22 +50,17 @@ module Curses
       return if buffer_full?
 
       char_as_string = char.chr
+      add_to_parallel_buffer(char_as_string)
 
-      slim_buffer_value = current_buffer
-      slim_buffer_value << char_as_string
-      full_buffer_value = slim_buffer_value
-
-      set_buffer(0, full_buffer_value)
+      sync_parallel_buffer_with_curses_buffer!
     end
 
     def delete_char
       return if buffer_empty?
 
-      # Keep all but the last character.
-      new_buffer_value = current_buffer[0..-2]
+      delete_char_from_parallel_buffer
 
-      # Update the buffer.
-      set_buffer(0, new_buffer_value)
+      sync_parallel_buffer_with_curses_buffer!
     end
 
     def max_buffer_size=(value)
@@ -73,10 +68,30 @@ module Curses
     end
 
     def current_buffer
-      buffer(0).rstrip.clone
+      parallel_buffer
     end
 
     private
+
+    def add_to_parallel_buffer(s)
+      @parallel_buffer << s
+    end
+
+    def delete_char_from_parallel_buffer
+      @parallel_buffer = @parallel_buffer[0..-2]
+    end
+
+    def sync_parallel_buffer_with_curses_buffer!
+      set_buffer(0, parallel_buffer + "  ")
+    end
+
+    def parallel_buffer
+      if @parallel_buffer
+        @parallel_buffer.clone
+      else
+        @parallel_buffer = ''
+      end
+    end
 
     def buffer_empty?
       current_buffer.empty?
@@ -316,6 +331,8 @@ module Curses
             insert_char(ch)
           when '_'
             insert_char(ch)
+          when ' '
+            insert_char(ch)
           when Curses::Key::UP
             goto_prev_field
           when Curses::Key::DOWN
@@ -420,14 +437,28 @@ module Curses
         @curses_fields_mapped_by_name[active_field_name]
       end
 
+      # The trailing spaces don't seem to count when using REQ_END_LINE, so
+      # we have to count how many trailing spaces there are and move the
+      # cursor over that amount to get the effect that we typed a space.
+      def move_cursor_by_trailing_whitespace
+        if (match_data = active_field.current_buffer.match(/(\s+)\z/))
+          trailing_spaces = match_data.captures[0]
+          trailing_spaces.size.times { driver(Curses::REQ_RIGHT_CHAR) }
+        end
+      end
+
       def insert_char(ch)
         active_field.insert_char(ch)
         driver(Curses::REQ_END_LINE)
+
+        move_cursor_by_trailing_whitespace
       end
 
       def delete_char
-        active_field.delete_char 
+        active_field.delete_char
         driver(Curses::REQ_END_FIELD)
+
+        move_cursor_by_trailing_whitespace
       end
 
       def goto_prev_field
@@ -498,7 +529,7 @@ module Curses
 
         # Create an Ext::Window as a container for this menu.
 
-        # TODO: If given options has border: false, then we don't need top
+        # REVIEW: If given options has border: false, then we don't need top
         # padding I don't think.
         default_args_for_window = {
           sub_window_top_padding: 1
